@@ -1,0 +1,48 @@
+/*
+* @file data_memory.sv 
+* @brief RAM for use with program
+* @author Nicholas Amore namore7@gmail.com
+* @date Creater 8/7/2025
+*/
+
+parameter DEPTH = 64; //Implementing minimal memory for simplicity
+
+module data_memory (
+  input         clk_i,
+  input         rst_ni,
+  
+  input  [31:0] data_address_i,
+  output [31:0] address_data_o,
+  
+  input         wr_en_i,
+  input  [31:0] wr_dat_i
+);
+
+logic [31:0] ram_d[DEPTH-1:0];
+logic [31:0] ram_q;
+logic [31:0] addr;
+logic [31:0] wr_dat;
+logic        wr_en;
+
+assign addr   = data_address_i;
+assign wr_en  = wr_en_i;
+assign wr_dat = wr_dat_i;
+
+
+always_ff @(posedge clk_i or negedge rst_ni) begin
+  if (!rst_ni) begin
+    for (int i = 0; i < (DEPTH-1); i = i + 1) begin
+      ram_d[i] <= 'h0;
+    end
+    ram_q <= '0;
+  end else begin
+    ram_q <= ram_d[{addr[31:2], 2'b00}];
+    if (wr_en) begin
+      ram_d[{addr[31:2], 2'b00}] <= wr_dat;
+    end
+  end
+end
+
+assign address_data_o = ram_q;
+
+endmodule
