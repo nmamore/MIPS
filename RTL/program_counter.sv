@@ -16,7 +16,7 @@ module program_counter (
 
 logic [31:0] data_d, data_q;
 
-assign data_d = pc_next_i
+assign data_d = pc_next_i;
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
   if (!rst_ni) begin
@@ -26,6 +26,6 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
   end
 end
 
-pc_current_o = data_q;
+assign pc_current_o = data_q;
 
 endmodule

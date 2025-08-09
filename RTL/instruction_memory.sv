@@ -5,8 +5,6 @@
 * @date Creater 8/6/2025
 */
 
-`include "program.svh"
-
 parameter DEPTH = 64; //Implementing minimal memory for simplicity
 
 module instruction_memory (

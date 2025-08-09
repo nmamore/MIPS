@@ -26,7 +26,8 @@ logic [4:0] reg_addr_1;
 logic [4:0] reg_addr_2;
 
 logic [31:0] reg_data_d[0:(SIZE-1)];
-logic [31:0] rd_dat_q;
+logic [31:0] rd_dat_1_q;
+logic [31:0] rd_dat_2_q;
 
 
 assign reg_addr_1 = rd_addr_1_i;
@@ -54,7 +55,7 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
   end
 end
 
-assign rd_dat_1_o = rd_dat_q;
-assign rd_dat_2_o = rd_dat_q;
+assign rd_dat_1_o = rd_dat_1_q;
+assign rd_dat_2_o = rd_dat_2_q;
 
 endmodule
