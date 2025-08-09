@@ -5,6 +5,8 @@
 * @date Creater 8/1/2025
 */
 
+`timescale 1ns/1ps
+
 module topMIPS (
   input clk_i,
   input rst_ni
@@ -60,7 +62,8 @@ assign reg_rd_addr_2    = inst_out[20:16]; //Read address of Rt
 assign reg_wr_addr      = (reg_wr_addr_src) ? inst_out[15:11]: //Set write address to Rd
                                               inst_out[20:16]; //or Rt
 assign sign_imm [15:0]  = inst_out[15:0];  //Set least significant nibble to immediate
-assign sign_imm [31:16] = inst_out[15];    //Sign extend immediate
+
+assign sign_imm [31:16] = {16{inst_out[15]}};    //Sign extend immediate
 assign funct            = inst_out[5:0];
 
 //Write register data routing
@@ -76,7 +79,7 @@ assign pc_next = pc_out + 32'h00000004; //Generates next instruction address
 assign pc_src = branch & f_zero; //Logic for determining if PC will branch
 
 assign pc_jta = {pc_next[31:28], inst_out[25:0], 2'b00}; //Sets up address PC will jump to
-assign pc_shift = {sign_imm[31:2], 2'b00} + pc_next; //Multiplies immediate address by 4 for word alignment, adds to next instruction location
+assign pc_shift = {sign_imm[29:0], 2'b00} + pc_next; //Multiplies immediate address by 4 for word alignment, adds to next instruction location
 
 assign pc_branch =(pc_src) ? pc_shift: //Sets potential PC to branch location
                              pc_next; //or next instruction
@@ -126,7 +129,7 @@ register_file reg_file (
 );
 
 alu_module alu (
-  .opcode_i   (alu_control),
+  .opcode_i   (alu_op),
   .operand_a_i(reg_rd_data_1),
   .operand_b_i(alu_operand_b),
   

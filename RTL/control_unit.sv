@@ -5,6 +5,8 @@
 * @date Creater 8/6/2025
 */
 
+`timescale 1ns/1ps
+
 //Opcode Constants
 localparam OP_R    = 6'h00;
 localparam OP_J    = 6'h02;
@@ -139,7 +141,7 @@ always_comb begin
       dat_mem_wr_en = 1'b0;
       reg_wr_addr_src = 1'b0;
       reg_wr_data_src = 1'b0;
-      alu_operand_b_src = 1'b1;
+      alu_operand_b_src = 1'b0;
       branch = 1'b1;
       jump = 1'b0;
     end

@@ -5,6 +5,8 @@
 * @date Creater 8/6/2025
 */
 
+`timescale 1ns/1ps
+
 localparam OP_AND   = 3'h0;
 localparam OP_OR    = 3'h1;
 localparam OP_ADD   = 3'h2;
@@ -13,11 +15,11 @@ localparam OP_ORBN  = 3'h5;
 localparam OP_SUB   = 3'h6;
 localparam OP_SLT   = 3'h7;
 
-module control_unit (
+module alu_module (
   input  [2:0]  opcode_i,
   
-  output [31:0] operand_a_i,
-  output [31:0] operand_b_i,
+  input [31:0]  operand_a_i,
+  input [31:0]  operand_b_i,
   
   output        zero_flag_o,
   output [31:0] result_o

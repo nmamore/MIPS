@@ -5,6 +5,8 @@
 * @date Creater 8/6/2025
 */
 
+`timescale 1ns/1ps
+
 module program_counter (
   input         clk_i,
   input         rst_ni,

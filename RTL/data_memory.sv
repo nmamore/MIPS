@@ -5,7 +5,9 @@
 * @date Creater 8/7/2025
 */
 
-parameter DEPTH = 64; //Implementing minimal memory for simplicity
+`timescale 1ns/1ps
+
+localparam DEPTH = 64; //Implementing minimal memory for simplicity
 
 module data_memory (
   input         clk_i,
@@ -19,7 +21,6 @@ module data_memory (
 );
 
 logic [31:0] ram_d[DEPTH-1:0];
-logic [31:0] ram_q;
 logic [31:0] addr;
 logic [31:0] wr_dat;
 logic        wr_en;
@@ -31,18 +32,14 @@ assign wr_dat = wr_dat_i;
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
   if (!rst_ni) begin
-    for (int i = 0; i < (DEPTH-1); i = i + 1) begin
+    for (int i = 0; i < DEPTH; i = i + 1) begin
       ram_d[i] <= 'h0;
     end
-    ram_q <= '0;
-  end else begin
-    ram_q <= ram_d[{addr[31:2], 2'b00}];
-    if (wr_en) begin
-      ram_d[{addr[31:2], 2'b00}] <= wr_dat;
-    end
+  end else if (wr_en) begin
+    ram_d[{2'b00, addr[31:2]}] <= wr_dat;
   end
 end
 
-assign address_data_o = ram_q;
+assign address_data_o = ram_d[{2'b00, addr[31:2]}];
 
 endmodule
