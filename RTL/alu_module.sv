@@ -35,6 +35,8 @@ assign op_val    = opcode_i;
 assign operand_a = operand_a_i;
 assign operand_b = operand_b_i;
 
+assign temp = operand_a - operand_b;
+
 always_comb begin
   unique case (op_val)
     OP_AND: begin
@@ -53,13 +55,12 @@ always_comb begin
       alu_out = operand_a | (~operand_b);
     end
     OP_SUB: begin
-      alu_out = operand_a - operand_b;
+      alu_out = temp;
     end
     OP_SLT: begin
       if (operand_a[31] ^ operand_b[31]) begin
         alu_out = 32'h00000001;
       end else begin
-        temp = operand_a - operand_b;
         alu_out = {31'h00000000, temp[31]};
       end
     end

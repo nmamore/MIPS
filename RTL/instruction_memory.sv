@@ -7,12 +7,12 @@
 
 `timescale 1ns/1ps
 
-localparam DEPTH = 64; //Implementing minimal memory for simplicity
-
 module instruction_memory (
   input  [31:0] inst_mem_addr_i,
   output [31:0] inst_mem_data_o
 );
+
+localparam DEPTH = 64; //Implementing minimal memory for simplicity
 
 logic [31:0] rom[DEPTH-1:0];
 logic [31:0] addr;

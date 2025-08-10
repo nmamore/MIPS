@@ -31,6 +31,7 @@ logic [4:0] wr_addr;
 logic [31:0] reg_data_d[0:(SIZE-1)];
 logic [31:0] wr_data;
 
+logic        wr_en;
 
 assign reg_addr_1 = rd_addr_1_i;
 assign reg_addr_2 = rd_addr_2_i;

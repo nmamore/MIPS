@@ -8,9 +8,77 @@
 `timescale 1ns/1ps
 
 module topMIPS (
-  input clk_i,
-  input rst_ni
+  input        clk_i,
+  input        clk_btn_ni,
+  input        rst_ni,
+  
+  output [7:0] hex_0_o,
+  output [7:0] hex_1_o,
+  output [7:0] hex_2_o,
+  output [7:0] hex_3_o,
+  output [7:0] hex_4_o,
+  output [7:0] hex_5_o,
+  
+  input        sw_0_i,
+  input        sw_1_i,
+  input        sw_2_i,
+  input        sw_3_i,
+  input        sw_4_i,
+  input        sw_5_i,
+  input        sw_6_i,
+  input        sw_7_i,
+  input        sw_8_i,
+  input        sw_9_i,
+  
+  output       led_r_0_o,
+  output       led_r_1_o,
+  output       led_r_2_o,
+  output       led_r_3_o,
+  output       led_r_4_o,
+  output       led_r_5_o,
+  output       led_r_6_o,
+  output       led_r_7_o,
+  output       led_r_8_o,
+  output       led_r_9_o
 );
+
+//General Signals
+
+logic        mclk;
+logic        sync_rst_n;
+logic        sync_clk_btn_n;
+
+logic [9:0]  led_array;
+logic        sync_sw_0, sync_sw_1, sync_sw_2, sync_sw_3, sync_sw_4, sync_sw_5, sync_sw_6, sync_sw_7, sync_sw_8, sync_sw_9;
+logic [9:0]  sw_array;
+logic [31:0] disp_dat;
+logic [15:0] ram_dat;
+logic [31:0] disp_addr;
+logic        clk_sel;
+logic        nibble_sel;
+
+assign sw_array   = {sync_sw_9, sync_sw_8, sync_sw_7, sync_sw_6, sync_sw_5, sync_sw_4, sync_sw_3, sync_sw_2, sync_sw_1, sync_sw_0};
+assign led_array  = (sw_array[9:0]);
+assign disp_addr  = {22'h000000, sw_array[9:2], 2'b00};
+assign clk_sel    = sw_array[0];
+assign nibble_sel = sw_array[1];
+
+assign ram_dat = (nibble_sel) ? disp_dat[31:16]:
+                                disp_dat[15:0];
+                                
+assign mclk = (clk_sel) ? ~sync_clk_btn_n:
+                           clk_i;
+
+assign led_r_0_o = led_array[0];
+assign led_r_1_o = led_array[1];
+assign led_r_2_o = led_array[2];
+assign led_r_3_o = led_array[3];
+assign led_r_4_o = led_array[4];
+assign led_r_5_o = led_array[5];
+assign led_r_6_o = led_array[6];
+assign led_r_7_o = led_array[7];
+assign led_r_8_o = led_array[8];
+assign led_r_9_o = led_array[9];
 
 //Control Signals
 logic [5:0]  opcode;
@@ -101,8 +169,8 @@ control_unit control (
 );
 
 program_counter pc (
-  .clk_i       (clk_i),
-  .rst_ni      (rst_ni),
+  .clk_i       (mclk),
+  .rst_ni      (sync_rst_n),
   
   .pc_next_i   (pc_in),
   .pc_current_o(pc_out)
@@ -114,8 +182,8 @@ instruction_memory inst_mem (
 );
 
 register_file reg_file (
-  .clk_i      (clk_i),
-  .rst_ni     (rst_ni),
+  .clk_i      (mclk),
+  .rst_ni     (sync_rst_n),
   
   .rd_addr_1_i(reg_rd_addr_1),
   .rd_dat_1_o (reg_rd_data_1),
@@ -138,14 +206,119 @@ alu_module alu (
 );
 
 data_memory data_mem (
-  .clk_i         (clk_i),
-  .rst_ni        (rst_ni),
+  .clk_i         (mclk),
+  .rst_ni        (sync_rst_n),
   
   .data_address_i(alu_result),
   .address_data_o(dat_mem_rd_dat),
   
   .wr_en_i       (dat_mem_wr_en),
-  .wr_dat_i      (reg_rd_data_2)
+  .wr_dat_i      (reg_rd_data_2),
+  
+  .disp_addr_i   (disp_addr),
+  .disp_dat_o    (disp_dat)
+);
+
+sev_seg_display hex0 (
+  .dat_i      (ram_dat[3:0]),
+  .seven_seg_o(hex_0_o)
+);
+
+sev_seg_display hex1 (
+  .dat_i      (ram_dat[7:4]),
+  .seven_seg_o(hex_1_o)
+);
+
+sev_seg_display hex2 (
+  .dat_i      (ram_dat[11:8]),
+  .seven_seg_o(hex_2_o)
+);
+
+sev_seg_display hex3 (
+  .dat_i      (ram_dat[15:12]),
+  .seven_seg_o(hex_3_o)
+);
+
+sev_seg_display hex4 (
+  .dat_i      (pc_out[3:0]),
+  .seven_seg_o(hex_4_o)
+);
+
+sev_seg_display hex5 (
+  .dat_i      (pc_out[7:4]),
+  .seven_seg_o(hex_5_o)
+);
+
+sync sw_0_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_0_i),
+  .sync_o (sync_sw_0)
+);
+
+sync sw_1_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_1_i),
+  .sync_o (sync_sw_1)
+);
+
+sync sw_2_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_2_i),
+  .sync_o (sync_sw_2)
+);
+
+sync sw_3_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_3_i),
+  .sync_o (sync_sw_3)
+);
+
+sync sw_4_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_4_i),
+  .sync_o (sync_sw_4)
+);
+
+sync sw_5_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_5_i),
+  .sync_o (sync_sw_5)
+);
+
+sync sw_6_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_6_i),
+  .sync_o (sync_sw_6)
+);
+
+sync sw_7_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_7_i),
+  .sync_o (sync_sw_7)
+);
+
+sync sw_8_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_8_i),
+  .sync_o (sync_sw_8)
+);
+
+sync sw_9_sync (
+  .clk_i  (clk_i),
+  .async_i(sw_9_i),
+  .sync_o (sync_sw_9)
+);
+
+sync rst_sync (
+  .clk_i  (clk_i),
+  .async_i(rst_ni),
+  .sync_o (sync_rst_n)
+);
+
+sync clk_btn_sync (
+  .clk_i  (clk_i),
+  .async_i(clk_btn_ni),
+  .sync_o (sync_clk_btn_n)
 );
 
 endmodule

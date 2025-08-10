@@ -7,8 +7,6 @@
 
 `timescale 1ns/1ps
 
-localparam DEPTH = 64; //Implementing minimal memory for simplicity
-
 module data_memory (
   input         clk_i,
   input         rst_ni,
@@ -17,18 +15,26 @@ module data_memory (
   output [31:0] address_data_o,
   
   input         wr_en_i,
-  input  [31:0] wr_dat_i
+  input  [31:0] wr_dat_i,
+  
+  input [31:0]  disp_addr_i,
+  output [31:0] disp_dat_o
 );
+
+
+localparam DEPTH = 64; //Implementing minimal memory for simplicity
 
 logic [31:0] ram_d[DEPTH-1:0];
 logic [31:0] addr;
 logic [31:0] wr_dat;
+logic [31:0] disp_addr;
 logic        wr_en;
 
 assign addr   = data_address_i;
 assign wr_en  = wr_en_i;
 assign wr_dat = wr_dat_i;
 
+assign disp_addr = disp_addr_i;
 
 always_ff @(posedge clk_i or negedge rst_ni) begin
   if (!rst_ni) begin
@@ -41,5 +47,6 @@ always_ff @(posedge clk_i or negedge rst_ni) begin
 end
 
 assign address_data_o = ram_d[{2'b00, addr[31:2]}];
+assign disp_dat_o     = ram_d[{2'b00, disp_addr[31:2]}];
 
 endmodule
