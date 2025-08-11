@@ -12,7 +12,7 @@ module instruction_memory (
   output [31:0] inst_mem_data_o
 );
 
-localparam DEPTH = 64; //Implementing minimal memory for simplicity
+localparam DEPTH = 256; //Implementing minimal memory for simplicity
 
 logic [31:0] rom[DEPTH-1:0];
 logic [31:0] addr;

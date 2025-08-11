@@ -22,7 +22,7 @@ module data_memory (
 );
 
 
-localparam DEPTH = 64; //Implementing minimal memory for simplicity
+localparam DEPTH = 256; //Implementing minimal memory for simplicity
 
 logic [31:0] ram_d[DEPTH-1:0];
 logic [31:0] addr;

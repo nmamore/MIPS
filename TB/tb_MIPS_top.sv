@@ -33,7 +33,7 @@ logic led_r_7;
 logic led_r_8;
 logic led_r_9;
 
-logic [31:0] sw_array;
+logic [9:0] sw_array;
 
 topMIPS uut (
   .clk_i(fpga_clk),
@@ -76,7 +76,7 @@ initial begin
   clk_btn_n  = 1'b1;
   #200;
   fpga_rst_n = 1'b1;
-  sw_array = 32'h00000050;
+  sw_array = 10'h050;
 end
 
 initial begin
