@@ -42,6 +42,8 @@ module topMIPS (
   output       led_r_9_o
 );
 
+//Signal Declarations
+
 //General Signals
 
 logic        mclk;
@@ -57,6 +59,116 @@ logic [31:0] disp_addr;
 logic        clk_sel;
 logic        nibble_sel;
 
+//Control Signals
+logic [5:0]  opcode;
+logic [5:0]  funct;
+
+logic        mem_addr_sel;
+logic        mem_wr_en;
+
+logic        ir_wr_en;
+
+logic        reg_wr_en;
+logic        reg_wr_addr_sel;
+logic        reg_wr_dat_sel;
+
+logic        alu_op_a_sel;
+logic [1:0]  alu_op_b_sel;
+logic [2:0]  alu_op;
+
+
+logic [1:0]  pc_src_sel;
+logic        cntl_branch;
+logic        pc_wr_en;
+
+//PC Signals
+logic        pc_en;
+logic [31:0] pc_next;
+logic [31:0] pc_current;
+
+//Memory Signals
+logic [31:0] mem_addr;
+logic [31:0] mem_dat_out;
+
+//Data Register Signals
+logic [31:0] inst_out;
+
+//Instruction Register Signals
+logic [31:0] dat_reg_out;
+
+//Register file signals
+logic [4:0]  reg_rd_addr_1;
+logic [31:0] reg_rd_dat_1;
+logic [4:0]  reg_rd_addr_2;
+logic [31:0] reg_rd_dat_2;
+logic [4:0]  reg_wr_addr;
+logic [31:0] reg_wr_dat;
+
+//A and B register signals
+logic [31:0] reg_a_dat;
+logic [31:0] reg_b_dat;
+
+//Sign Extension
+logic [31:0] sign_imm; //Sign extended immediate
+logic [31:0] sign_imm_mult; //Sign immediate multiplied by 4
+
+logic [31:0] j_addr; //Address for jump instruction
+
+//ALU signals
+logic [31:0] alu_operand_a;
+logic [31:0] alu_operand_b;
+logic [31:0] alu_result;
+logic        f_zero;
+
+//Accumulator Signals
+logic [31:0] alu_out;
+
+//Signal Assignments
+
+//Memory address selection
+assign mem_addr = (mem_addr_sel) ? alu_out:
+                                   pc_current;
+
+//Instruction Signal Routing
+assign opcode           = inst_out[31:26];
+assign reg_rd_addr_1    = inst_out[25:21]; //Read address of Rs
+assign reg_rd_addr_2    = inst_out[20:16]; //Read address of Rt
+assign reg_wr_addr      = (reg_wr_addr_sel) ? inst_out[15:11]: //Set write address to Rd
+                                              inst_out[20:16]; //or Rt
+assign sign_imm [15:0]  = inst_out[15:0];  //Set least significant nibble to immediate
+
+assign sign_imm [31:16] = {16{inst_out[15]}};    //Sign extend immediate
+assign funct            = inst_out[5:0];
+
+//Address Extension for Jump
+assign j_addr = {pc_current[31:28], inst_out[25:0], 2'b00};
+
+//Sign Immediate routing
+assign sign_imm_mult = {sign_imm[29:0], 2'b00};
+
+//Write register data routing
+assign reg_wr_dat = (reg_wr_dat_sel) ? dat_reg_out: //Set register write data to data memory output
+                                       alu_out;     //Or ALU result
+//ALU Source A routing
+assign alu_operand_a = (alu_op_a_sel) ? reg_a_dat: //Set ALU operand A to current PC instruction
+                                        pc_current;  //or to A register data
+
+//ALU Source B routing
+assign alu_operand_b = (alu_op_b_sel == 2'b00)  ? reg_b_dat:     //Set ALU operand B to B register data
+                       (alu_op_b_sel == 2'b01)  ? 32'h00000004:  //or to 4
+                       (alu_op_b_sel == 2'b10)  ? sign_imm:      //or to the signed immediate
+                       (alu_op_b_sel == 2'b11)  ? sign_imm_mult: reg_b_dat; //or to the signed immediate multiplied by 4
+
+//Program Counter Branching
+assign pc_branch = cntl_branch & f_zero; //Logic for determining if PC will branch
+assign pc_en  = pc_branch | pc_wr_en;    //Write address to PC if write or branch set
+
+//Program Counter Next Address Selection
+assign pc_next = (pc_src_sel == 2'b00) ? alu_result: //Set next PC address to ALU result
+                 (pc_src_sel == 2'b01) ? alu_out:    //or value stored in accumulator
+                 (pc_src_sel == 2'b10) ? j_addr: alu_result; //or jump address
+
+//DE-10
 assign sw_array   = {sync_sw_9, sync_sw_8, sync_sw_7, sync_sw_6, sync_sw_5, sync_sw_4, sync_sw_3, sync_sw_2, sync_sw_1, sync_sw_0};
 assign led_array  = (sw_array[9:0]);
 assign disp_addr  = {22'h000000, sw_array[9:2], 2'b00};
@@ -80,105 +192,71 @@ assign led_r_7_o = led_array[7];
 assign led_r_8_o = led_array[8];
 assign led_r_9_o = led_array[9];
 
-//Control Signals
-logic [5:0]  opcode;
-logic [5:0]  funct;
-logic [2:0]  alu_op;
-logic        reg_wr_en;
-logic        reg_wr_addr_src;
-logic        reg_wr_data_src;
-logic        alu_operand_b_src;
-logic        branch;
-logic        jump;
-
-//Instruction Memory Signals
-logic [31:0] inst_out;
-
-//PC Signals
-logic [31:0] pc_in;
-logic [31:0] pc_out;
-logic [31:0] pc_next;
-logic [31:0] pc_shift;
-logic [31:0] pc_branch;
-logic [31:0] pc_jta;
-logic        pc_src;
-
-//Register file signals
-logic [4:0]  reg_rd_addr_1;
-logic [31:0] reg_rd_data_1;
-logic [4:0]  reg_rd_addr_2;
-logic [31:0] reg_rd_data_2;
-logic [4:0]  reg_wr_addr;
-logic [31:0] reg_wr_data;
-
-//Sign Extension
-logic [31:0] sign_imm; //Sign extended immediate
-
-//ALU signals
-logic [31:0] alu_operand_b;
-logic [31:0] alu_result;
-logic        f_zero;
-
-//Data memory signals
-logic [31:0] dat_mem_rd_dat;
-logic        dat_mem_wr_en;
-
-//Instruction Signal Routing
-assign opcode           = inst_out[31:26];
-assign reg_rd_addr_1    = inst_out[25:21]; //Read address of Rs
-assign reg_rd_addr_2    = inst_out[20:16]; //Read address of Rt
-assign reg_wr_addr      = (reg_wr_addr_src) ? inst_out[15:11]: //Set write address to Rd
-                                              inst_out[20:16]; //or Rt
-assign sign_imm [15:0]  = inst_out[15:0];  //Set least significant nibble to immediate
-
-assign sign_imm [31:16] = {16{inst_out[15]}};    //Sign extend immediate
-assign funct            = inst_out[5:0];
-
-//Write register data routing
-assign reg_wr_data = (reg_wr_data_src) ? dat_mem_rd_dat: //Set register write data to data memory output
-                                         alu_result;      //Or ALU result
-//ALU Source B routing
-assign alu_operand_b = (alu_operand_b_src) ? sign_imm:      //Set ALU operand B to sign-extended immediate
-                                             reg_rd_data_2; //or register read data 2
-
-//Program Counter Incrementation/Branching
-assign pc_next = pc_out + 32'h00000004; //Generates next instruction address
-
-assign pc_src = branch & f_zero; //Logic for determining if PC will branch
-
-assign pc_jta = {pc_next[31:28], inst_out[25:0], 2'b00}; //Sets up address PC will jump to
-assign pc_shift = {sign_imm[29:0], 2'b00} + pc_next; //Multiplies immediate address by 4 for word alignment, adds to next instruction location
-
-assign pc_branch =(pc_src) ? pc_shift: //Sets potential PC to branch location
-                             pc_next; //or next instruction
-assign pc_in = (jump) ? pc_jta: //Sets PC to jump address
-                           pc_branch; //or branch location or next instruction
 control_unit control (
+  .clk_i              (mclk),
+  .rst_ni             (sync_rst_n),
+  
   .opcode_i           (opcode),
   .funct_i            (funct),
   
-  .alu_op_o           (alu_op),
-  .reg_wr_en_o        (reg_wr_en),
-  .dat_mem_wr_en_o    (dat_mem_wr_en),
+  .mem_addr_sel_o     (mem_addr_sel),
+  .mem_wr_en_o        (mem_wr_en),
   
-  .reg_wr_addr_src_o  (reg_wr_addr_src),
-  .reg_wr_data_src_o  (reg_wr_data_src),
-  .alu_operand_b_src_o(alu_operand_b_src),
-  .branch_o           (branch),
-  .jump_o             (jump)
+  .ir_wr_en_o         (ir_wr_en),
+  
+  .reg_wr_en_o        (reg_wr_en),
+  .reg_wr_addr_sel_o  (reg_wr_addr_sel),
+  .reg_wr_dat_sel_o   (reg_wr_dat_sel),
+  
+  .alu_op_a_sel_o     (alu_op_a_sel),
+  .alu_op_b_sel_o     (alu_op_b_sel),
+  .alu_op_o           (alu_op),
+  
+  .pc_src_sel_o       (pc_src_sel),
+  .cntl_branch_o      (cntl_branch),
+  .pc_wr_en_o         (pc_wr_en)
 );
 
 program_counter pc (
   .clk_i       (mclk),
   .rst_ni      (sync_rst_n),
   
-  .pc_next_i   (pc_in),
-  .pc_current_o(pc_out)
+  .pc_wr_en_i  (pc_en),
+  
+  .pc_next_i   (pc_next),
+  .pc_current_o(pc_current)
 );
 
-instruction_memory inst_mem (
-  .inst_mem_addr_i(pc_out),
-  .inst_mem_data_o(inst_out)
+memory mem (
+  .clk_i        (mclk),
+  .rst_ni       (sync_rst_n),
+
+  .mem_addr_i   (mem_addr),
+  .mem_rd_data_o(mem_dat_out),
+
+  .mem_wr_en_i  (mem_wr_en),
+  .mem_wr_data_i(reg_b_dat),
+
+  .disp_addr_i  (disp_addr),
+  .disp_dat_o   (disp_dat)
+);
+
+reg_single inst_reg (
+  .clk_i     (mclk),
+  .rst_ni    (sync_rst_n),
+
+  .wr_en_i   (ir_wr_en),
+  .reg_dat_i (mem_dat_out),
+  .reg_dat_o (inst_out)
+);
+
+reg_single dat_reg (
+  .clk_i     (mclk),
+  .rst_ni    (sync_rst_n),
+
+  .wr_en_i   (1'b1),
+  .reg_dat_i (mem_dat_out),
+  .reg_dat_o (dat_reg_out)
 );
 
 register_file reg_file (
@@ -186,37 +264,50 @@ register_file reg_file (
   .rst_ni     (sync_rst_n),
   
   .rd_addr_1_i(reg_rd_addr_1),
-  .rd_dat_1_o (reg_rd_data_1),
+  .rd_dat_1_o (reg_rd_dat_1),
   
   .rd_addr_2_i(reg_rd_addr_2),
-  .rd_dat_2_o (reg_rd_data_2),
+  .rd_dat_2_o (reg_rd_dat_2),
   
   .wr_en_i    (reg_wr_en),
   .wr_addr_i  (reg_wr_addr),
-  .wr_data_i  (reg_wr_data)
+  .wr_dat_i   (reg_wr_dat)
+);
+
+reg_single a_reg (
+  .clk_i     (mclk),
+  .rst_ni    (sync_rst_n),
+
+  .wr_en_i   (1'b1),
+  .reg_dat_i (reg_rd_dat_1),
+  .reg_dat_o (reg_a_dat)
+);
+
+reg_single b_reg (
+  .clk_i     (mclk),
+  .rst_ni    (sync_rst_n),
+
+  .wr_en_i   (1'b1),
+  .reg_dat_i (reg_rd_dat_2),
+  .reg_dat_o (reg_b_dat)
 );
 
 alu_module alu (
   .opcode_i   (alu_op),
-  .operand_a_i(reg_rd_data_1),
+  .operand_a_i(alu_operand_a),
   .operand_b_i(alu_operand_b),
   
   .zero_flag_o(f_zero),
   .result_o   (alu_result)
 );
 
-data_memory data_mem (
-  .clk_i         (mclk),
-  .rst_ni        (sync_rst_n),
-  
-  .data_address_i(alu_result),
-  .address_data_o(dat_mem_rd_dat),
-  
-  .wr_en_i       (dat_mem_wr_en),
-  .wr_dat_i      (reg_rd_data_2),
-  
-  .disp_addr_i   (disp_addr),
-  .disp_dat_o    (disp_dat)
+reg_single accumulator (
+  .clk_i     (mclk),
+  .rst_ni    (sync_rst_n),
+
+  .wr_en_i   (1'b1),
+  .reg_dat_i (alu_result),
+  .reg_dat_o (alu_out)
 );
 
 sev_seg_display hex0 (
@@ -240,12 +331,12 @@ sev_seg_display hex3 (
 );
 
 sev_seg_display hex4 (
-  .dat_i      (pc_out[3:0]),
+  .dat_i      (pc_current[3:0]),
   .seven_seg_o(hex_4_o)
 );
 
 sev_seg_display hex5 (
-  .dat_i      (pc_out[7:4]),
+  .dat_i      (pc_current[7:4]),
   .seven_seg_o(hex_5_o)
 );
 

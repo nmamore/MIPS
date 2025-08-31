@@ -21,7 +21,7 @@ module register_file (
   
   input         wr_en_i,
   input  [4:0]  wr_addr_i,
-  input  [31:0] wr_data_i
+  input  [31:0] wr_dat_i
 );
 
 logic [4:0] reg_addr_1;
@@ -38,7 +38,7 @@ assign reg_addr_2 = rd_addr_2_i;
 
 assign wr_en      = wr_en_i;
 assign wr_addr    = wr_addr_i;
-assign wr_data    = wr_data_i;
+assign wr_data    = wr_dat_i;
 
 
 always_ff @(posedge clk_i or negedge rst_ni) begin

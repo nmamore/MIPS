@@ -10,7 +10,9 @@
 module program_counter (
   input         clk_i,
   input         rst_ni,
-   
+  
+  input         pc_wr_en_i,
+  
   input  [31:0] pc_next_i,
   output [31:0] pc_current_o
   
@@ -23,7 +25,7 @@ assign data_d = pc_next_i;
 always_ff @(posedge clk_i or negedge rst_ni) begin
   if (!rst_ni) begin
     data_q <= '0;
-  end else begin
+  end else if (pc_wr_en_i) begin
     data_q <= data_d;
   end
 end

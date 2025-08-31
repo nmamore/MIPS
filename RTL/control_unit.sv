@@ -22,179 +22,249 @@ localparam R_AND = 6'h24;
 localparam R_OR  = 6'h25;
 localparam R_SLT = 6'h2A;
 
+//ALU outputs
+localparam ADD   = 3'b010;
+localparam SUB   = 3'b110;
+localparam AND   = 3'b000;
+localparam OR    = 3'b001;
+localparam SLT   = 3'b111;
+
+//Selection Parameters
+localparam NULL_SEL        = 8'b00000000;
+localparam ALU_A_SEL       = 8'b00000001;
+localparam ALU_B_SEL_01    = 8'b00000010;
+localparam ALU_B_SEL_10    = 8'b00000100;
+localparam PC_SEL_01       = 8'b00001000;
+localparam PC_SEL_10       = 8'b00010000;
+localparam MEM_SEL         = 8'b00100000;
+localparam REG_WR_DAT_SEL  = 8'b01000000;
+localparam REG_WR_ADDR_SEL = 8'b10000000;
+
+//Enable Parameters
+localparam NULL_EN   = 5'b00000;
+localparam REG_F_EN  = 5'b00001;
+localparam BRANCH_EN = 5'b00010;
+localparam PC_EN     = 5'b00100;
+localparam MEM_EN    = 5'b01000;
+localparam IR_EN     = 5'b10000;
+
 module control_unit (
-  input  [5:0] opcode_i,
-  input  [5:0] funct_i,
-  
-  output [2:0] alu_op_o,
-  output       reg_wr_en_o,
-  output       dat_mem_wr_en_o,
-  
-  output       reg_wr_addr_src_o,
-  output       reg_wr_data_src_o,
-  output       alu_operand_b_src_o,
-  output       branch_o,
-  output       jump_o
+  input         clk_i,
+  input         rst_ni,
+
+  input  [5:0]  opcode_i,
+  input  [5:0]  funct_i,
+
+  output        mem_addr_sel_o,
+  output        mem_wr_en_o,
+
+  output        ir_wr_en_o,
+
+  output        reg_wr_en_o,
+  output        reg_wr_addr_sel_o,
+  output        reg_wr_dat_sel_o,
+
+  output        alu_op_a_sel_o,
+  output  [1:0] alu_op_b_sel_o,
+  output  [2:0] alu_op_o,
+
+  output  [1:0] pc_src_sel_o,
+  output        cntl_branch_o,
+  output        pc_wr_en_o
 );
 
-typedef enum logic [2:0] {
-  ALU_AND = 3'h0,
-  ALU_OR  = 3'h1,
-  ALU_ADD = 3'h2,
-  ALU_SUB = 3'h6,
-  ALU_SLT = 3'h7
-} alu_opcode_e;
-alu_opcode_e alu_op;
+typedef enum {
+  StFetch,
+  StDecode,
+  StMemAdr,
+  StMemRead,
+  StMemWriteback,
+  StMemWrite,
+  StExecute,
+  StALUWriteback,
+  StBranch,
+  StADDIExecute,
+  StADDIWriteback,
+  StJump
+} state_e;
 
-logic [5:0] op_val;
-logic [5:0] funct_val;
-logic       reg_wr_en;
-logic       dat_mem_wr_en;
-logic       reg_wr_addr_src;
-logic       reg_wr_data_src;
-logic       alu_operand_b_src;
-logic       branch;
-logic       jump;
+state_e state_d, state_q;
 
-assign op_val = opcode_i;
-assign funct_val = funct_i;
+logic [7:0] mux_sel;
+logic [4:0] reg_en;
+logic [1:0] alu_sel;
+
+logic [2:0] alu_op;
+
+assign reg_wr_addr_sel_o = mux_sel[7];
+assign reg_wr_dat_sel_o  = mux_sel[6];
+assign mem_addr_sel_o    = mux_sel[5];
+assign pc_src_sel_o      = mux_sel[4:3];
+assign alu_op_b_sel_o    = mux_sel[2:1];
+assign alu_op_a_sel_o    = mux_sel[0];
+
+assign ir_wr_en_o    = reg_en[4];
+assign mem_wr_en_o   = reg_en[3];
+assign pc_wr_en_o    = reg_en[2];
+assign cntl_branch_o = reg_en[1];
+assign reg_wr_en_o   = reg_en[0];
+
+assign alu_op_o = alu_op;
+
+always_ff @(posedge clk_i or negedge rst_ni) begin
+  if (!rst_ni) begin
+    state_q <= StFetch;
+  end else begin
+    state_q <= state_d;
+  end
+end
 
 always_comb begin
-  unique case (op_val)
-    OP_R: begin
-      unique case (funct_val)
-        R_ADD: begin
-          alu_op = ALU_ADD;
-          reg_wr_en = 1'b1;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b1;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+  state_d = state_q;
+  unique case (state_q)
+    StFetch: begin //Retrieves instruction from memory
+      mux_sel = ALU_B_SEL_01; //Sets memory to read address from PC, ALU to increment address of PC
+      reg_en  = PC_EN | IR_EN; //Writes new address to PC, stores instruction in IR
+      alu_sel = 2'b00; //Sets addition operation
+      state_d = StDecode; //Move to interpret instruction
+    end
+    StDecode: begin //Interprets retrieved instruction
+      mux_sel = ALU_B_SEL_01 | ALU_B_SEL_10;
+      reg_en  = NULL_EN;
+      alu_sel = 2'b00;
+      unique case (opcode_i) //Next state determined by opcode
+        OP_R: begin
+          state_d = StExecute;
         end
-        R_SUB: begin
-          alu_op = ALU_SUB;
-          reg_wr_en = 1'b1;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b1;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+        OP_J: begin
+          state_d = StJump;
         end
-        R_AND: begin
-          alu_op = ALU_AND;
-          reg_wr_en = 1'b1;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b1;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+        OP_BEQ: begin
+          state_d = StBranch;
         end
-        R_OR: begin
-          alu_op = ALU_OR;
-          reg_wr_en = 1'b1;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b1;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+        OP_ADDI: begin
+          state_d = StADDIExecute;
         end
-        R_SLT: begin
-          alu_op = ALU_SLT;
-          reg_wr_en = 1'b1;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b1;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+        OP_LDW: begin
+          state_d = StMemAdr;
+        end
+        OP_STW: begin
+          state_d = StMemAdr;
         end
         default: begin
-          alu_op = ALU_ADD;
-          reg_wr_en = 1'b0;
-          dat_mem_wr_en = 1'b0;
-          reg_wr_addr_src = 1'b0;
-          reg_wr_data_src = 1'b0;
-          alu_operand_b_src = 1'b0;
-          branch = 1'b0;
-          jump = 1'b0;
+          state_d = StFetch;
         end
       endcase
     end
-    OP_J: begin
-      alu_op = ALU_ADD;
-      reg_wr_en = 1'b0;
-      dat_mem_wr_en = 1'b0;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b0;
-      alu_operand_b_src = 1'b0;
-      branch = 1'b0;
-      jump = 1'b1;
+    StMemAdr: begin //Computes location of memory address from instruction
+      mux_sel = ALU_B_SEL_10 | ALU_A_SEL; //Sets ALU operands to output of register file and sign extended immediate.
+      reg_en  = NULL_EN; //No register writes
+      alu_sel = 2'b00; //Sets addition operation. Result stored in accumulator
+      if (opcode_i == OP_LDW) begin
+        state_d = StMemRead;
+      end else if (opcode_i == OP_STW) begin
+        state_d = StMemWrite;
+      end else begin
+        state_d = StFetch;
+      end
     end
-    OP_BEQ: begin
-      alu_op = ALU_SUB;
-      reg_wr_en = 1'b0;
-      dat_mem_wr_en = 1'b0;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b0;
-      alu_operand_b_src = 1'b0;
-      branch = 1'b1;
-      jump = 1'b0;
+    StMemRead: begin
+      mux_sel = MEM_SEL;
+      reg_en  = NULL_EN;
+      alu_sel = 2'b00;
+      state_d = StMemWriteback;
     end
-    OP_ADDI: begin
-      alu_op = ALU_ADD;
-      reg_wr_en = 1'b1;
-      dat_mem_wr_en = 1'b0;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b0;
-      alu_operand_b_src = 1'b1;
-      branch = 1'b0;
-      jump = 1'b0;
+    StMemWriteback: begin
+      mux_sel = REG_WR_DAT_SEL;
+      reg_en  = REG_F_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
     end
-    OP_LDW: begin
-      alu_op = ALU_ADD;
-      reg_wr_en = 1'b1;
-      dat_mem_wr_en = 1'b0;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b1;
-      alu_operand_b_src = 1'b1;
-      branch = 1'b0;
-      jump = 1'b0;
+    StMemWrite: begin
+      mux_sel = MEM_SEL;
+      reg_en  = MEM_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
     end
-    OP_STW: begin
-      alu_op = ALU_ADD;
-      reg_wr_en = 1'b0;
-      dat_mem_wr_en = 1'b1;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b1;
-      alu_operand_b_src = 1'b1;
-      branch = 1'b0;
-      jump = 1'b0;
+    StExecute: begin
+      mux_sel = ALU_A_SEL;
+      reg_en  = NULL_EN;
+      alu_sel = 2'b10;
+      state_d = StALUWriteback;
+    end
+    StALUWriteback: begin
+      mux_sel = REG_WR_ADDR_SEL;
+      reg_en  = REG_F_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
+    end
+    StBranch: begin
+      mux_sel = PC_SEL_01 | ALU_A_SEL;
+      reg_en  = BRANCH_EN;
+      alu_sel = 2'b01;
+      state_d = StFetch;
+    end
+    StADDIExecute: begin
+      mux_sel = ALU_B_SEL_10 | ALU_A_SEL;
+      reg_en  = NULL_EN;
+      alu_sel = 2'b00;
+      state_d = StADDIWriteback;
+    end
+    StADDIWriteback: begin
+      mux_sel = NULL_SEL;
+      reg_en  = REG_F_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
+    end
+    StJump: begin
+      mux_sel = PC_SEL_10;
+      reg_en  = PC_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
     end
     default: begin
-      alu_op = ALU_ADD;
-      reg_wr_en = 1'b0;
-      dat_mem_wr_en = 1'b0;
-      reg_wr_addr_src = 1'b0;
-      reg_wr_data_src = 1'b0;
-      alu_operand_b_src = 1'b0;
-      branch = 1'b0;
-      jump = 1'b0;
+      mux_sel = NULL_SEL;
+      reg_en  = NULL_EN;
+      alu_sel = 2'b00;
+      state_d = StFetch;
     end
   endcase
 end
 
-assign alu_op_o    = alu_op;
-assign reg_wr_en_o = reg_wr_en;
-assign dat_mem_wr_en_o = dat_mem_wr_en;
-assign reg_wr_addr_src_o = reg_wr_addr_src;
-assign reg_wr_data_src_o = reg_wr_data_src;
-assign alu_operand_b_src_o = alu_operand_b_src;
-assign branch_o = branch;
-assign jump_o = jump;
+always_comb begin
+  unique case (alu_sel)
+    2'b00: begin
+      alu_op = ADD;
+    end
+    2'b01: begin
+      alu_op = SUB;
+    end
+    2'b10: begin
+      unique case (funct_i)
+        R_ADD: begin
+          alu_op = ADD;
+        end
+        R_SUB: begin
+          alu_op = SUB;
+        end
+        R_AND: begin
+          alu_op = AND;
+        end
+        R_OR: begin
+          alu_op = OR;
+        end
+        R_SLT: begin
+          alu_op = SLT;
+        end
+        default: begin
+          alu_op = ADD;
+        end
+      endcase
+    end
+    default: begin
+      alu_op = ADD;
+    end
+  endcase
+end
 
 endmodule
